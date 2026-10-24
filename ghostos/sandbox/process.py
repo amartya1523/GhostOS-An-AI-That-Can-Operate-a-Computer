@@ -1,8 +1,10 @@
 """Process sandbox: the fallback when Docker is unavailable.
 
-Weaker isolation than a container, but still useful: a scrubbed environment,
-POSIX resource limits (CPU time, file size, open files, process count) and a hard
-wall-clock timeout that kills the whole process group.
+This is NOT isolation: commands can read any file the user can and use the network
+(``Limits.network`` is only enforced by the Docker sandbox). What it does provide is a
+scrubbed environment (no API keys or tokens leak in), POSIX limits on CPU time, file
+size and open files, and a hard wall-clock timeout that kills the whole process group.
+Use Docker for anything untrusted.
 """
 
 from __future__ import annotations

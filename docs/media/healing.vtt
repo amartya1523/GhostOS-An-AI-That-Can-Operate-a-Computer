@@ -1,0 +1,40 @@
+WEBVTT
+
+00:00:00.274 --> 00:00:03.797
+GhostOS — Self-healing browser agent real run · nothing scripted
+
+00:00:03.797 --> 00:00:08.301
+GhostOS takes a task in plain English, then plans, acts, verifies and heals itself.
+
+00:00:08.301 --> 00:00:17.881
+Run 1 · Acme Billing v1. GhostOS has never seen this app — it plans 9 steps and fingerprints every element it touches.
+
+00:00:17.881 --> 00:00:21.440
+Run 1 done: 9/9 steps. Selectors + fingerprints + screenshots are now in memory.
+
+00:00:21.440 --> 00:00:28.559
+Now Acme ships a redesign: new layout, new IDs, renamed buttons and labels. Every v1 selector is dead.
+
+00:00:28.559 --> 00:00:33.064
+A classic Playwright script breaks on step one:  page.fill('#username')  →  TimeoutError
+
+00:00:33.064 --> 00:00:35.668
+Run 2 · same task, redesigned site. Watch the Healer agent.
+
+00:00:35.668 --> 00:00:38.732
+Healer: the remembered selector is gone → score every element on screen against the stored fingerprint.
+
+00:00:38.732 --> 00:00:45.982
+Fingerprint = text, role, position, form order, classes, labels… many weak signals survive a redesign.
+
+00:00:45.982 --> 00:00:52.626
+7 of 9 steps self-healed. Each healing is explained (old → new selector, strategy, confidence, screen diff) and saved to memory.
+
+00:00:52.626 --> 00:00:54.098
+7 of 9 steps self-healed. Each healing is explained (old → new selector, strategy, confidence, screen diff) and saved to memory.
+
+00:00:54.098 --> 00:01:06.310
+Run 3 · GhostOS remembers: zero healing needed, learned selectors come straight from memory.
+
+00:01:06.310 --> 00:01:09.829
+GhostOS — github.com/amartya1523/GhostOS-An-AI-That-Can-Operate-a-Computer

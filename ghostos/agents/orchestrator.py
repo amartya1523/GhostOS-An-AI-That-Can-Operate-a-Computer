@@ -23,6 +23,7 @@ from ghostos.agents.verifier import Verifier
 from ghostos.core.graph import END, StateGraph
 from ghostos.core.types import Observation, Plan, RunStatus, StepRecord, StepStatus
 from ghostos.safety.gate import PermissionGate
+from ghostos.safety.redact import redact
 from ghostos.tools.base import ToolContext, ToolRegistry
 
 
@@ -63,6 +64,7 @@ class Orchestrator:
         verifier: Verifier,
         healer: Healer,
         max_replans: int = 2,
+        step_delay_ms: int = 0,
     ) -> None:
         self.registry = registry
         self.gate = gate
@@ -70,6 +72,7 @@ class Orchestrator:
         self.verifier = verifier
         self.healer = healer
         self.max_replans = max_replans
+        self.step_delay_ms = step_delay_ms
         self.graph = self._build()
 
     def _build(self) -> StateGraph[RunState]:
@@ -136,6 +139,8 @@ class Orchestrator:
 
     async def act_node(self, s: RunState) -> RunState:
         rec, ctx = s.current, s.ctx
+        if self.step_delay_ms:
+            await asyncio.sleep(self.step_delay_ms / 1000)
         rec.status, rec.attempts = StepStatus.RUNNING, rec.attempts + 1
         try:
             tool, args = self.registry.parse(rec.step.tool, rec.step.args)
@@ -184,7 +189,12 @@ class Orchestrator:
         assert obs is not None
         verdict = await self.verifier.check(rec.step, obs, s.ctx)
         s.last_verdict = verdict.reason
-        healed = bool(obs.data.get("healed")) or rec.attempts > 1
+        # "Healed" means the UI changed under us or the agent corrected its own work —
+        # not a plain retry after a timeout.
+        healed = bool(obs.data.get("healed")) or (rec.step.tool == "code.fix" and rec.attempts > 1)
+        if s.ctx.browser:
+            # Only remember what an element looks like once the step is verified.
+            s.ctx.browser.locator.settle(commit=verdict.passed)
         if verdict.passed:
             rec.status = StepStatus.HEALED if healed else StepStatus.PASSED
             s.healed_steps += int(healed)
@@ -250,7 +260,7 @@ class Orchestrator:
             failed = next((r for r in s.records if r.status == StepStatus.FAILED), None)
             if failed:
                 s.ctx.memory.add_lesson(
-                    f"Task “{s.task[:120]}” failed at “{failed.step.intent}”: {s.last_verdict}",
+                    f"Task “{redact(s.task)[:120]}” failed at “{failed.step.intent}”: {s.last_verdict}",
                     run_id=s.ctx.run_id,
                     tags=["failure", failed.step.tool],
                 )

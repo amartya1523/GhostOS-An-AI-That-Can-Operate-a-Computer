@@ -82,6 +82,7 @@ class SelfHealingLocator:
         self.emit = emit
         self.llm = llm
         self._shots = 0
+        self._staged: tuple[str, str, Resolution, str | None, str] | None = None
 
     async def candidates(self, page: Page, kind: str) -> list[Fingerprint]:
         raw = await page.evaluate(EXTRACT_JS)
@@ -220,6 +221,17 @@ class SelfHealingLocator:
             screenshot=str(annotated),
         )
         return res
+
+    def stage(
+        self, page_url: str, label: str, res: Resolution, screenshot: str | None, run_id: str
+    ) -> None:
+        """Hold what was learned until the verifier confirms the step really worked."""
+        self._staged = (page_url, label, res, screenshot, run_id)
+
+    def settle(self, commit: bool) -> None:
+        staged, self._staged = self._staged, None
+        if staged and commit:
+            self.learn(*staged)
 
     def learn(
         self, page_url: str, label: str, res: Resolution, screenshot: str | None, run_id: str

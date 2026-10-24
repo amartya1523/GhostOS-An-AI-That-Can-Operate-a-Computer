@@ -1,0 +1,47 @@
+1
+00:00:00,212 --> 00:00:04,230
+GhostOS · Dev agent — find bugs → patch → self-correct → test → pull request with a human in the loop for anything irreversible
+
+2
+00:00:04,316 --> 00:00:07,823
+Task: “fix the failing tests in fixtures/buggy_repo and open a pull request”.
+
+3
+00:00:07,823 --> 00:00:12,889
+Heads-up: this recording uses the scripted LLM provider so it's reproducible. Set ANTHROPIC_API_KEY for real reasoning.
+
+4
+00:00:12,889 --> 00:00:19,213
+The repo is copied into an isolated sandbox and its test suite runs…
+
+5
+00:00:19,213 --> 00:00:21,870
+3 failing tests. The Coder agent reads the failures and the source, then proposes a patch.
+
+6
+00:00:21,870 --> 00:00:25,094
+Patch #1 fixes the separator and discount bugs… but the Verifier re-runs the suite: 1 test still fails.
+
+7
+00:00:25,094 --> 00:00:30,106
+Self-correction: the Healer feeds that failure back, and the Coder finds the real root cause (padding width).
+
+8
+00:00:30,106 --> 00:00:32,262
+12/12 tests green → commit on a new branch.
+
+9
+00:00:32,262 --> 00:00:36,768
+Guardian: opening a pull request is irreversible, so GhostOS stops and asks a human.
+
+10
+00:00:36,769 --> 00:00:38,496
+Approved ✓
+
+11
+00:00:38,496 --> 00:00:43,500
+Done. PR drafted with diagnosis, verification and diff — the original repo was never touched.
+
+12
+00:00:43,500 --> 00:00:47,026
+GhostOS — github.com/amartya1523/GhostOS-An-AI-That-Can-Operate-a-Computer

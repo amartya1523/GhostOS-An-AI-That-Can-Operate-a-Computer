@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import base64
 import difflib
 import os
 import re
@@ -176,11 +178,17 @@ class FixCode(Tool[FixArgs]):
         budget = 40_000
         for path in sorted(ctx.workspace.rglob("*.py")):
             rel = path.relative_to(ctx.workspace)
-            if ".git" in rel.parts or rel.name.startswith("test_") or "tests" in rel.parts:
+            if (
+                ".git" in rel.parts
+                or rel.name.startswith("test_")
+                or "tests" in rel.parts
+                or rel.name == "conftest.py"
+                or rel.name.endswith("_test.py")
+            ):
                 continue
             text = path.read_text(errors="replace")
             if len(text) > budget:
-                break
+                continue
             budget -= len(text)
             sources.append(f"### {rel}\n```python\n{text}\n```")
         failing = "\n".join(f"- {f['test']}: {f['reason']}" for f in report.get("failures", []))
@@ -194,7 +202,7 @@ class FixCode(Tool[FixArgs]):
     @staticmethod
     def _apply(workspace: Path, edit: dict[str, Any]) -> str:
         rel = edit["path"]
-        if re.search(r"(^|/)tests?/|(^|/)test_[^/]*\.py$", rel):
+        if re.search(r"(^|/)tests?/|(^|/)test_[^/]*\.py$|_test\.py$|(^|/)conftest\.py$", rel):
             raise PermissionError(f"refusing to edit test file {rel}")
         path = resolve_in(workspace, rel)
         before = path.read_text()
@@ -210,8 +218,13 @@ class FixCode(Tool[FixArgs]):
         )
 
 
+# Git refs and GitHub repo names: no leading "-" (option injection), no shell metacharacters.
+REF = r"^[A-Za-z0-9_][A-Za-z0-9._/-]{0,100}$"
+REPO = r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+
+
 class CommitArgs(BaseModel):
-    branch: str = "ghostos/fix-failing-tests"
+    branch: str = Field(default="ghostos/fix-failing-tests", pattern=REF)
     message: str = "Fix failing tests"
 
 
@@ -234,9 +247,9 @@ class Commit(Tool[CommitArgs]):
 class PRArgs(BaseModel):
     title: str
     body: str = ""
-    base: str = "main"
+    base: str = Field(default="main", pattern=REF)
     repo: str | None = Field(
-        default=None, description="owner/name on GitHub; omit for a local dry-run"
+        default=None, pattern=REPO, description="owner/name on GitHub; omit for a local dry-run"
     )
 
 
@@ -249,13 +262,15 @@ class PullRequest(Tool[PRArgs]):
     Args = PRArgs
 
     def summarize(self, args: PRArgs) -> str:
-        where = args.repo or "local dry-run"
-        return f"open pull request “{args.title}” → {where}"
+        where = f"github.com/{args.repo}" if args.repo else "local dry-run"
+        return f"open pull request “{args.title}” into {args.base} → {where}"
 
     async def run(self, args: PRArgs, ctx: ToolContext) -> Observation:
         branch = ctx.scratch.get("branch", "HEAD")
         span = shlex.quote(f"{args.base}...{branch}")
-        diff = await ctx.sandbox.run(f"git diff {span} --stat && git diff {span}", ctx.workspace)
+        diff = await ctx.sandbox.run(
+            f"git diff --stat {span} -- && git diff {span} --", ctx.workspace
+        )
         body = args.body or self._default_body(ctx)
         token = os.environ.get("GITHUB_TOKEN")
         if args.repo and token:
@@ -296,15 +311,31 @@ class PullRequest(Tool[PRArgs]):
     async def _open_on_github(
         self, args: PRArgs, ctx: ToolContext, branch: str, body: str, token: str
     ) -> Observation:
-        remote = f"https://x-access-token:{token}@github.com/{args.repo}.git"
-        refspec = shlex.quote(f"{branch}:{branch}")
-        push = await ctx.sandbox.run(
-            f"git push -q {shlex.quote(remote)} {refspec}", ctx.workspace, Limits(network=True)
+        # Pushed from the host (an approved network action), with the token passed via the
+        # environment as an HTTP header — never in argv, where `ps` could read it.
+        basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+        env = {
+            **os.environ,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
+            "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {basic}",
+        }
+        proc = await asyncio.create_subprocess_exec(
+            "git",
+            "push",
+            "-q",
+            f"https://github.com/{args.repo}.git",
+            f"{branch}:{branch}",
+            cwd=ctx.workspace,
+            env=env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-        if not push.ok:
-            return Observation(
-                ok=False, error=push.summary().replace(token, "***"), error_kind="exit_code"
-            )
+        _, err = await asyncio.wait_for(proc.communicate(), 120)
+        if proc.returncode:
+            message = err.decode(errors="replace").replace(token, "***").replace(basic, "***")
+            return Observation(ok=False, error=message[-1000:], error_kind="exit_code")
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
                 f"https://api.github.com/repos/{args.repo}/pulls",

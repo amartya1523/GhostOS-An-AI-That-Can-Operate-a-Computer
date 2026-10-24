@@ -34,4 +34,5 @@ def get_provider(
         return OpenAICompatProvider(model or None)
     if name == "auto":
         return None
-    raise LLMError(f"provider '{name}' is not configured (missing API key?)")
+    hint = {"anthropic": "set ANTHROPIC_API_KEY", "openai": "set OPENAI_API_KEY or OPENAI_BASE_URL"}
+    raise LLMError(f"provider '{name}' is not configured ({hint.get(name, 'unknown provider')})")

@@ -76,7 +76,7 @@ EXTRACT_JS = r"""
       name: el.getAttribute('name') || '',
       autocomplete: el.getAttribute('autocomplete') || '',
       classes: [...el.classList].slice(0, 12),
-      text: clean(el.innerText || el.value),
+      text: clean(el.innerText || (['submit', 'button', 'reset'].includes(el.type) ? el.value : '')),
       aria: clean(el.getAttribute('aria-label') || el.getAttribute('title')),
       placeholder: clean(el.getAttribute('placeholder')),
       label: labelFor(el),

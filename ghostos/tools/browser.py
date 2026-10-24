@@ -159,7 +159,7 @@ async def _act(ctx: ToolContext, label: str, kind: str, text: str | None = None)
     except Exception as exc:
         return Observation(ok=False, error=str(exc), error_kind="action_failed", screenshot=before)
 
-    s.locator.learn(url_before, label, res, before, ctx.run_id)
+    s.locator.stage(url_before, label, res, before, ctx.run_id)
     shot = await s.frame(f"{kind} “{label}”" + (" (healed)" if res.healed else ""))
     data = {
         "selector": res.selector,

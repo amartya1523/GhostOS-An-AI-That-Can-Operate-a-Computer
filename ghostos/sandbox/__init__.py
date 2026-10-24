@@ -8,7 +8,7 @@ __all__ = ["DockerSandbox", "ExecResult", "Limits", "ProcessSandbox", "Sandbox",
 
 
 async def select_sandbox(preference: str = "auto") -> Sandbox:
-    """Pick Docker when requested or available, otherwise fall back to the process sandbox."""
+    """Pick Docker when requested or available (daemon up + image built), else the process sandbox."""
     if preference == "process":
         return ProcessSandbox()
     if preference == "docker" or await DockerSandbox.available():

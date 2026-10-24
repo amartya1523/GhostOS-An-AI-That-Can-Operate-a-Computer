@@ -17,11 +17,19 @@ TASK = (
 @pytest.mark.e2e
 async def test_self_healing_across_a_redesign(settings, demo_server) -> None:
     ghost = GhostOS(settings)
-    httpx.post(f"{demo_server}/sites/acme/deploy", json={"version": "v1"})
+    httpx.post(
+        f"{demo_server}/sites/acme/deploy",
+        json={"version": "v1"},
+        headers={"x-ghostos-client": "test"},
+    )
     first = await ghost.run(TASK.format(url=demo_server))
     assert first.status == RunStatus.SUCCEEDED and first.healed == 0
 
-    httpx.post(f"{demo_server}/sites/acme/deploy", json={"version": "v2"})  # every selector dies
+    httpx.post(
+        f"{demo_server}/sites/acme/deploy",
+        json={"version": "v2"},
+        headers={"x-ghostos-client": "test"},
+    )  # every selector dies
     second = await ghost.run(TASK.format(url=demo_server))
     assert second.status == RunStatus.SUCCEEDED
     assert second.healed >= 5

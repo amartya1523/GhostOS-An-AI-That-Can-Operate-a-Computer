@@ -6,7 +6,7 @@ import contextlib
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +17,28 @@ from ghostos.runtime import GhostOS
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "fixtures"
 DASHBOARD_OUT = ROOT / "dashboard" / "out"
+DEV_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
+CLIENT_HEADER = "x-ghostos-client"
+
+
+async def require_client_header(
+    x_ghostos_client: str | None = Header(default=None),
+) -> None:
+    """CSRF guard for state-changing endpoints.
+
+    A web page on another origin cannot attach a custom header without a CORS preflight,
+    and the preflight fails for origins we don't allow. So a request carrying this header
+    came from the dashboard, the CLI or a script — never from a random website.
+    """
+    if not x_ghostos_client:
+        raise HTTPException(403, f"missing {CLIENT_HEADER} header")
+
+
+def origin_allowed(origin: str | None, host: str | None) -> bool:
+    """Browsers always send Origin on WebSockets; non-browser clients may omit it."""
+    if origin is None:
+        return True
+    return origin in DEV_ORIGINS or origin.split("://", 1)[-1] == host
 
 
 class RunRequest(BaseModel):
@@ -40,7 +62,7 @@ def create_app(ghost: GhostOS | None = None) -> FastAPI:
     app.state.acme_version = "v1"
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=sorted(DEV_ORIGINS),
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -50,7 +72,7 @@ def create_app(ghost: GhostOS | None = None) -> FastAPI:
     async def acme() -> str:
         return (FIXTURES / f"acme_{app.state.acme_version}" / "index.html").read_text()
 
-    @app.post("/sites/acme/deploy")
+    @app.post("/sites/acme/deploy", dependencies=[Depends(require_client_header)])
     async def deploy(body: Deploy) -> dict[str, str]:
         if body.version not in ("v1", "v2"):
             raise HTTPException(400, "version must be v1 or v2")
@@ -66,9 +88,9 @@ def create_app(ghost: GhostOS | None = None) -> FastAPI:
     async def health() -> dict[str, Any]:
         return {"ok": True, "memory": ghost.memory.stats(), "active_runs": list(ghost.active)}
 
-    @app.post("/api/runs")
+    @app.post("/api/runs", dependencies=[Depends(require_client_header)])
     async def create_run(req: RunRequest) -> dict[str, str]:
-        script = Path(req.script).resolve() if req.script else None
+        script = (ROOT / req.script).resolve() if req.script else None
         if script and FIXTURES not in script.parents:
             raise HTTPException(400, "scripts must live under fixtures/")
         return {"run_id": ghost.submit(req.task, provider=req.provider, script=script)}
@@ -99,7 +121,7 @@ def create_app(ghost: GhostOS | None = None) -> FastAPI:
             for r in ghost.broker.pending.values()
         ]
 
-    @app.post("/api/approvals/{approval_id}")
+    @app.post("/api/approvals/{approval_id}", dependencies=[Depends(require_client_header)])
     async def decide(approval_id: str, body: ApprovalDecision) -> dict[str, bool]:
         if not ghost.broker.resolve(approval_id, body.approved):
             raise HTTPException(404, "no such pending approval")
@@ -113,12 +135,15 @@ def create_app(ghost: GhostOS | None = None) -> FastAPI:
     @app.get("/api/artifact")
     async def artifact(path: str) -> FileResponse:
         target = Path(path).resolve()
-        if ghost.settings.home not in target.parents or not target.is_file():
+        if ghost.settings.runs_dir not in target.parents or not target.is_file():
             raise HTTPException(404, "artifact not found")
         return FileResponse(target)
 
     @app.websocket("/api/stream")
     async def stream(ws: WebSocket) -> None:
+        if not origin_allowed(ws.headers.get("origin"), ws.headers.get("host")):
+            await ws.close(code=1008)
+            return
         await ws.accept()
         with contextlib.suppress(WebSocketDisconnect, RuntimeError):
             async for event in ghost.bus.stream():

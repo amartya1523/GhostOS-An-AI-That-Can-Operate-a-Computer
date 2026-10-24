@@ -1,0 +1,11 @@
+services:
+  ghostos:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    ports: ["8765:8765"]
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    volumes: ["ghostos-data:/data"]
+
+volumes:
+  ghostos-data:

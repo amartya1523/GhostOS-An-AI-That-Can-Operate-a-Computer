@@ -6,6 +6,7 @@ import asyncio
 import os
 import shlex
 import shutil
+import uuid
 from pathlib import Path
 
 from ghostos.sandbox.base import ExecResult, Limits, truncate
@@ -20,25 +21,32 @@ class DockerSandbox:
         self.image = image
 
     @staticmethod
-    async def available() -> bool:
+    async def available(image: str = DEFAULT_IMAGE) -> bool:
+        """True when the daemon is up *and* the sandbox image was built locally (we never pull)."""
         if shutil.which("docker") is None:
             return False
         proc = await asyncio.create_subprocess_exec(
             "docker",
-            "info",
-            "--format",
-            "{{.ServerVersion}}",
+            "image",
+            "inspect",
+            image,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
         return await proc.wait() == 0
 
-    def build_argv(self, command: str, workspace: Path, limits: Limits) -> list[str]:
+    def build_argv(
+        self, command: str, workspace: Path, limits: Limits, name: str = "ghostos-sbx"
+    ) -> list[str]:
         argv = [
             "docker",
             "run",
             "--rm",
             "-i",
+            "--name",
+            name,
+            "--pull",
+            "never",
             "--network",
             "bridge" if limits.network else "none",
             "--memory",
@@ -73,15 +81,25 @@ class DockerSandbox:
 
     async def run(self, command: str, workspace: Path, limits: Limits | None = None) -> ExecResult:
         limits = limits or Limits()
-        argv = self.build_argv(command, workspace, limits)
+        name = f"ghostos-{uuid.uuid4().hex[:12]}"
+        argv = self.build_argv(command, workspace, limits, name)
         proc = await asyncio.create_subprocess_exec(
             *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         try:
             out, err = await asyncio.wait_for(proc.communicate(), limits.timeout_s)
         except TimeoutError:
-            proc.kill()
+            proc.kill()  # kills only the CLI; the container needs its own kill
             await proc.wait()
+            killer = await asyncio.create_subprocess_exec(
+                "docker",
+                "rm",
+                "-f",
+                name,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await killer.wait()
             return ExecResult(
                 124,
                 "",

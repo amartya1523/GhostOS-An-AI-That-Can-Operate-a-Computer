@@ -1,0 +1,9 @@
+# GhostOS permission policy. Point GHOSTOS_POLICY at a copy of this file.
+# Risk levels, least to most dangerous: read < write < execute < network < irreversible
+
+auto_approve_up_to: execute     # run without asking up to this level
+hard_limit: irreversible        # refuse anything above this, even with approval
+allowed_hosts:                  # browsing elsewhere asks first (empty list = anywhere)
+  - localhost
+  - 127.0.0.1
+denied_tools: []                # e.g. [files.write, github.pull_request]

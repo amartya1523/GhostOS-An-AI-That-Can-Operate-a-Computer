@@ -13,3 +13,4 @@ dist/
 .env
 .DS_Store
 scripts/_recordings/
+*.tsbuildinfo
