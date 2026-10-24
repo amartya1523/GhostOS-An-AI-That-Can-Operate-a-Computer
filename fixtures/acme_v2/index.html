@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Acme Billing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- v2 "redesign": new layout, new ids, renamed buttons and labels. Every v1 selector is now dead. -->
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 "Inter", -apple-system, "Segoe UI", sans-serif; background: #0f1222; color: #e6e8f2; }
+  .btn { border: 0; border-radius: 999px; padding: 11px 22px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: linear-gradient(135deg, #8b5cf6, #ec4899); color: #fff; }
+  .btn-ghost { background: transparent; color: #a5a9c4; border: 1px solid #2c3150; }
+  .split { display: grid; grid-template-columns: 1.1fr 1fr; min-height: 100vh; }
+  .hero { padding: 80px 64px; background: radial-gradient(circle at 20% 20%, #312e81, #0f1222 70%); }
+  .hero h1 { font-size: 44px; margin: 120px 0 12px; line-height: 1.1; }
+  .hero p { color: #a5a9c4; max-width: 420px; }
+  .panel { display: flex; align-items: center; justify-content: center; }
+  .auth { width: 400px; background: #171a2e; border: 1px solid #262a45; border-radius: 18px; padding: 32px; }
+  .auth h2 { margin: 0 0 6px; } .auth small { color: #8a8fb0; }
+  .field__label { display: block; font-size: 12px; letter-spacing: .4px; text-transform: uppercase; color: #8a8fb0; margin: 18px 0 6px; }
+  .field__input { width: 100%; padding: 12px 14px; background: #0f1222; border: 1px solid #2c3150; border-radius: 10px; color: #fff; font-size: 14px; }
+  .auth .btn { width: 100%; margin-top: 24px; }
+  .shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  aside { background: #141729; border-right: 1px solid #23273f; padding: 24px 18px; display: flex; flex-direction: column; gap: 8px; }
+  aside .logo { font-weight: 800; font-size: 18px; margin-bottom: 18px; }
+  aside a { color: #a5a9c4; text-decoration: none; padding: 9px 12px; border-radius: 8px; }
+  aside a.active { background: #23273f; color: #fff; }
+  aside .btn { margin-bottom: 14px; }
+  .content { padding: 36px 44px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .tile { background: #171a2e; border: 1px solid #262a45; border-radius: 14px; padding: 18px 20px; }
+  .tile b { display: block; font-size: 13px; color: #8a8fb0; font-weight: 500; } .tile span { font-size: 22px; font-weight: 700; }
+  .list { margin-top: 18px; }
+  .row { display: grid; grid-template-columns: 1fr 1.4fr 1fr 1fr; padding: 14px 20px; border-bottom: 1px solid #23273f; }
+  .pill { font-size: 12px; padding: 2px 10px; border-radius: 999px; justify-self: start; }
+  .pill.paid { background: #064e3b; color: #6ee7b7; } .pill.due { background: #4a2a07; color: #fcd34d; }
+  .drawer { max-width: 480px; }
+  .actions { display: flex; gap: 10px; margin-top: 26px; }
+  .toast { margin-top: 18px; padding: 14px 18px; background: #052e2b; color: #5eead4; border: 1px solid #115e59; border-radius: 12px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="screen-auth" class="split">
+  <div class="hero">
+    <h1>Billing,<br>reimagined.</h1>
+    <p>Acme Billing 2.0 — faster invoices, smarter reminders, a brand-new look.</p>
+  </div>
+  <div class="panel">
+    <form class="auth" onsubmit="event.preventDefault(); signIn()">
+      <h2>Welcome back</h2>
+      <small>Log in to Acme Billing 2.0</small>
+      <label class="field__label" for="user-email">Work email</label>
+      <input id="user-email" class="field__input" name="email" type="email" autocomplete="username" placeholder="you@company.com">
+      <label class="field__label" for="pass">Password</label>
+      <input id="pass" class="field__input" name="pass" type="password" autocomplete="current-password">
+      <button data-testid="auth-submit" class="btn btn-primary btn-lg" type="submit">Log in</button>
+      <a href="#" style="display:block;margin-top:14px;color:#8a8fb0;font-size:13px">Forgot password?</a>
+    </form>
+  </div>
+</div>
+
+<div id="screen-app" class="shell" hidden>
+  <aside>
+    <div class="logo">◆ Acme</div>
+    <button id="btn-create" class="btn btn-primary" onclick="openDrawer(true)">New invoice</button>
+    <a class="active" href="#">Invoices</a>
+    <a href="#">Customers</a>
+    <a href="#">Reports</a>
+    <a href="#">Settings</a>
+  </aside>
+  <div class="content">
+    <section id="overview">
+      <div class="grid">
+        <div class="tile"><b>Outstanding</b><span>$860</span></div>
+        <div class="tile"><b>Paid this month</b><span>$4,610</span></div>
+        <div class="tile"><b>Invoices</b><span id="count">3</span></div>
+      </div>
+      <div class="tile list" id="rows">
+        <div class="row"><span>INV-1039</span><span>Initech</span><span>$1,200</span><span class="pill paid">Paid</span></div>
+        <div class="row"><span>INV-1040</span><span>Umbrella Corp</span><span>$860</span><span class="pill due">Due</span></div>
+        <div class="row"><span>INV-1041</span><span>Hooli</span><span>$3,410</span><span class="pill paid">Paid</span></div>
+      </div>
+    </section>
+    <section id="drawer" class="tile drawer" hidden>
+      <form onsubmit="event.preventDefault(); create()">
+        <h2>Create an invoice</h2>
+        <label class="field__label" for="client">Client name</label>
+        <input id="client" class="field__input" name="customer">
+        <label class="field__label" for="total">Total (USD)</label>
+        <input id="total" class="field__input" name="amount" inputmode="decimal">
+        <div class="actions">
+          <button class="btn btn-ghost" type="button" onclick="openDrawer(false)">Discard</button>
+          <button id="submit-invoice" class="btn btn-primary" type="submit">Save invoice</button>
+        </div>
+      </form>
+    </section>
+    <div id="toast" class="toast" hidden></div>
+  </div>
+</div>
+
+<script>
+  let next = 1042;
+  function signIn() {
+    if (!document.getElementById('user-email').value) return;
+    document.getElementById('screen-auth').hidden = true;
+    document.getElementById('screen-app').hidden = false;
+  }
+  function openDrawer(open) {
+    document.getElementById('overview').hidden = open;
+    document.getElementById('drawer').hidden = !open;
+  }
+  function create() {
+    const c = document.getElementById('client').value, a = document.getElementById('total').value;
+    const id = 'INV-' + next++;
+    document.getElementById('rows').insertAdjacentHTML('afterbegin',
+      `<div class="row"><span>${id}</span><span>${c}</span><span>$${a}</span><span class="pill due">Due</span></div>`);
+    document.getElementById('count').textContent = String(next - 1039);
+    openDrawer(false);
+    const t = document.getElementById('toast');
+    t.textContent = `Invoice ${id} created for ${c}`; t.hidden = false;
+  }
+</script>
+</body>
+</html>

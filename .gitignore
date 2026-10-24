@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ghostos/
+node_modules/
+dashboard/.next/
+dashboard/out/
+*.egg-info/
+dist/
+.env
+.DS_Store
+scripts/_recordings/

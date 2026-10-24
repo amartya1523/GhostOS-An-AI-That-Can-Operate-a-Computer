@@ -1,0 +1,45 @@
+{
+  "note": "Deterministic replies for the reproducible dev-agent demo. The first patch is intentionally incomplete so the self-correction loop is visible. Run with --provider anthropic for real reasoning.",
+  "rules": [
+    {
+      "when": "PREVIOUS ATTEMPTS:\\n- \\(first attempt\\)",
+      "reply": {
+        "diagnosis": "Three independent bugs: parse_amount never strips thousands separators; apply_discount multiplies by the raw percent instead of percent/100; next_invoice_id drops the zero padding.",
+        "edits": [
+          {
+            "path": "invoicing/money.py",
+            "search": "cleaned = text.strip().lstrip(\"$\")",
+            "replace": "cleaned = text.strip().lstrip(\"$\").replace(\",\", \"\")",
+            "why": "'1,200.50' is not a valid Decimal literal"
+          },
+          {
+            "path": "invoicing/totals.py",
+            "search": "return (total - total * percent).quantize",
+            "replace": "return (total - total * percent / 100).quantize",
+            "why": "percent is 0-100, not a fraction"
+          },
+          {
+            "path": "invoicing/ids.py",
+            "search": "return f\"{match['prefix']}-{number}\"",
+            "replace": "return f\"{match['prefix']}-{number:03d}\"",
+            "why": "restore zero padding"
+          }
+        ]
+      }
+    },
+    {
+      "when": "attempt 1: .*test_next_id_keeps_padding",
+      "reply": {
+        "diagnosis": "The padding width was hard-coded to 3 digits, but ids are padded to the width of the previous id (INV-0041 has 4). Derive the width from the input instead.",
+        "edits": [
+          {
+            "path": "invoicing/ids.py",
+            "search": "    number = int(match[\"num\"]) + 1\n    return f\"{match['prefix']}-{number:03d}\"",
+            "replace": "    width = len(match[\"num\"])\n    number = int(match[\"num\"]) + 1\n    return f\"{match['prefix']}-{number:0{width}d}\"",
+            "why": "keep the original padding width"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Acme Billing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; color: #1f2430; }
+  .topbar { height: 60px; background: #1e3a8a; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; }
+  .brand { font-weight: 700; letter-spacing: .3px; }
+  .btn { border: 0; border-radius: 6px; padding: 10px 18px; font-size: 14px; cursor: pointer; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-light { background: #e5e7eb; color: #111827; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.12); padding: 28px; }
+  .login { width: 380px; margin: 110px auto; }
+  .login h2 { margin: 0 0 18px; }
+  label { display: block; font-size: 13px; color: #4b5563; margin: 12px 0 4px; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+  .login .btn { width: 100%; margin-top: 20px; }
+  main { max-width: 980px; margin: 32px auto; }
+  .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eef0f3; }
+  th { font-size: 12px; text-transform: uppercase; color: #6b7280; }
+  .paid { color: #059669; } .due { color: #d97706; }
+  .form { max-width: 460px; }
+  .actions { display: flex; gap: 10px; margin-top: 20px; }
+  .toast { margin-top: 18px; padding: 14px 16px; background: #ecfdf5; color: #065f46; border-radius: 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="topbar"><span class="brand">Acme Billing</span><span id="who"></span></div>
+
+<section id="view-login" class="card login">
+  <form id="login-form" onsubmit="event.preventDefault(); login()">
+    <h2>Sign in to Acme</h2>
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password">
+    <button id="login-btn" class="btn btn-primary" type="submit">Sign in</button>
+  </form>
+</section>
+
+<main id="view-app" hidden>
+  <section id="list">
+    <div class="head">
+      <h2>Invoices</h2>
+      <button id="new-invoice" class="btn btn-primary" onclick="show('form')">New invoice</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Invoice</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody id="rows">
+          <tr><td>INV-1039</td><td>Initech</td><td>$1,200</td><td class="paid">Paid</td></tr>
+          <tr><td>INV-1040</td><td>Umbrella Corp</td><td>$860</td><td class="due">Due</td></tr>
+          <tr><td>INV-1041</td><td>Hooli</td><td>$3,410</td><td class="paid">Paid</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="form" class="card form" hidden>
+    <form onsubmit="event.preventDefault(); save()">
+      <h2>New invoice</h2>
+      <label for="customer">Customer</label>
+      <input id="customer" name="customer">
+      <label for="amount">Amount</label>
+      <input id="amount" name="amount" inputmode="decimal">
+      <div class="actions">
+        <button id="save-invoice" class="btn btn-primary" type="submit">Save</button>
+        <button class="btn btn-light" type="button" onclick="show('list')">Cancel</button>
+      </div>
+    </form>
+  </section>
+  <div id="toast" class="toast" hidden></div>
+</main>
+
+<script>
+  let next = 1042;
+  function login() {
+    if (!document.getElementById('username').value) return;
+    document.getElementById('who').textContent = document.getElementById('username').value;
+    document.getElementById('view-login').hidden = true;
+    document.getElementById('view-app').hidden = false;
+  }
+  function show(id) {
+    document.getElementById('list').hidden = id !== 'list';
+    document.getElementById('form').hidden = id !== 'form';
+  }
+  function save() {
+    const c = document.getElementById('customer').value, a = document.getElementById('amount').value;
+    const id = 'INV-' + next++;
+    document.getElementById('rows').insertAdjacentHTML('afterbegin',
+      `<tr><td>${id}</td><td>${c}</td><td>$${a}</td><td class="due">Due</td></tr>`);
+    show('list');
+    const t = document.getElementById('toast');
+    t.textContent = `Invoice ${id} created for ${c}`; t.hidden = false;
+  }
+</script>
+</body>
+</html>
